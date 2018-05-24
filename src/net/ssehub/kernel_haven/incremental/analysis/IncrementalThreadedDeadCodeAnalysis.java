@@ -8,7 +8,7 @@ import net.ssehub.kernel_haven.incremental.settings.IncrementalAnalysisSettings;
 import net.ssehub.kernel_haven.incremental.storage.HybridCacheAdapter;
 import net.ssehub.kernel_haven.incremental.storage.IncrementalPostExtraction;
 import net.ssehub.kernel_haven.undead_analyzer.DeadCodeAnalysis;
-import net.ssehub.kernel_haven.undead_analyzer.DeadCodeFinder;
+import net.ssehub.kernel_haven.undead_analyzer.ThreadedDeadCodeFinder;
 import net.ssehub.kernel_haven.util.Logger;
 
 /**
@@ -16,7 +16,7 @@ import net.ssehub.kernel_haven.util.Logger;
  *
  * @author Moritz
  */
-public class IncrementalDeadCodeAnalysis extends PipelineAnalysis {
+public class IncrementalThreadedDeadCodeAnalysis extends PipelineAnalysis {
 
 	Logger LOGGER = Logger.get();
 
@@ -26,7 +26,7 @@ public class IncrementalDeadCodeAnalysis extends PipelineAnalysis {
 	 * @param config
 	 *            the config
 	 */
-	public IncrementalDeadCodeAnalysis(Configuration config) {
+	public IncrementalThreadedDeadCodeAnalysis(Configuration config) {
 		super(config);
 	}
 
@@ -56,7 +56,7 @@ public class IncrementalDeadCodeAnalysis extends PipelineAnalysis {
 		HybridCacheAdapter hca = new HybridCacheAdapter(config,
 				new IncrementalPostExtraction(config, getCmComponent(), getBmComponent(), getVmComponent()),
 				partialAnalysis);
-		DeadCodeFinder dcf = new DeadCodeFinder(config, hca.getVmComponent(), hca.getBmComponent(),
+		ThreadedDeadCodeFinder dcf = new ThreadedDeadCodeFinder(config, hca.getVmComponent(), hca.getBmComponent(),
 				hca.getCmComponent());
 
 		return dcf;
