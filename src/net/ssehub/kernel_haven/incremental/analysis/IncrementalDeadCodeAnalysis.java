@@ -7,6 +7,7 @@ import net.ssehub.kernel_haven.config.Configuration;
 import net.ssehub.kernel_haven.incremental.settings.IncrementalAnalysisSettings;
 import net.ssehub.kernel_haven.incremental.storage.HybridCacheAdapter;
 import net.ssehub.kernel_haven.incremental.storage.IncrementalPostExtraction;
+import net.ssehub.kernel_haven.incremental.storage.HybridCacheAdapter.CodeModelProcessing;
 import net.ssehub.kernel_haven.undead_analyzer.DeadCodeAnalysis;
 import net.ssehub.kernel_haven.undead_analyzer.DeadCodeFinder;
 import net.ssehub.kernel_haven.util.Logger;
@@ -40,14 +41,16 @@ public class IncrementalDeadCodeAnalysis extends PipelineAnalysis {
 		boolean updatedBuildModel = config.getValue(IncrementalAnalysisSettings.EXTRACT_BUILD_MODEL);
 		boolean updatedVariabilityModel = config.getValue(IncrementalAnalysisSettings.EXTRACT_VARIABILITY_MODEL);
 		
-		boolean partialAnalysis = !updatedBuildModel && !updatedVariabilityModel;
-
-		if (partialAnalysis) {
+		CodeModelProcessing cmProcessing;
+		
+		if (!updatedBuildModel && !updatedVariabilityModel) {
+			cmProcessing = CodeModelProcessing.PARTIAL;
 			LOGGER.logInfo(
 					"Neither build nor variability-model were modified compared to the last revision that was analyzed. Therefore "
 							+ IncrementalDeadCodeAnalysis.class.getSimpleName()
 							+ " will run on the updated parts of the code-model only.");
 		} else {
+			cmProcessing = CodeModelProcessing.COMPLETE;
 			LOGGER.logInfo(
 					"variability and/or build-model was modified compared to the last revision that was analyzed. Therefore "
 							+ IncrementalDeadCodeAnalysis.class.getSimpleName() + " will perform a full analysis.");
@@ -55,7 +58,7 @@ public class IncrementalDeadCodeAnalysis extends PipelineAnalysis {
 
 		HybridCacheAdapter hca = new HybridCacheAdapter(config,
 				new IncrementalPostExtraction(config, getCmComponent(), getBmComponent(), getVmComponent()),
-				partialAnalysis);
+				cmProcessing);
 		DeadCodeFinder dcf = new DeadCodeFinder(config, hca.getVmComponent(), hca.getBmComponent(),
 				hca.getCmComponent());
 
