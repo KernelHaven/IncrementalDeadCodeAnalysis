@@ -2,7 +2,7 @@
 
 This is an analysis-plugin for the [IncrementalAnalysesInfrastructure](https://github.com/KernelHaven/IncrementalAnalysesInfrastructure) performing the DeadCodeAnalysis. This analysis does not work without the incremental infrastructure plugin.
 
-Similar to UndeadAnalyzer, two variants of the analysis exist (a single-threaded and a multithreaded version):
+Similar to UndeadAnalyzer, two variants of the analysis exist (a single-threaded and a multithreaded version)
 
 
 ## Usage
