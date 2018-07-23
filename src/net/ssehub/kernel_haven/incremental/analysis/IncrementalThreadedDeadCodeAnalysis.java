@@ -53,7 +53,7 @@ public class IncrementalThreadedDeadCodeAnalysis extends PipelineAnalysis {
         CodeModelProcessing cmProcessing;
 
         if (!updatedBuildModel && !updatedVariabilityModel) {
-            cmProcessing = CodeModelProcessing.PARTIAL;
+            cmProcessing = CodeModelProcessing.NEWLY_EXTRACTED;
             LOGGER.logInfo("Neither build nor variability-model were modified "
                 + "compared to the last revision that was analyzed. Therefore "
                 + IncrementalDeadCodeAnalysis.class.getSimpleName()
