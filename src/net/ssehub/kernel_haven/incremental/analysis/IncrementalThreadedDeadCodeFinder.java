@@ -109,10 +109,6 @@ public class IncrementalThreadedDeadCodeFinder
                         }
                     }, numThreads);
 
-            if (considerVmVarsOnly) {
-                relevancyChecker =
-                    new FormulaRelevancyChecker(vm, considerVmVarsOnly);
-            }
 
             for (SourceFile sourceFile : cm) {
                 parallelizer.add(sourceFile);
