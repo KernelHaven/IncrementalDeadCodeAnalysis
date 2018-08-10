@@ -25,6 +25,7 @@ import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.config.Configuration;
 import net.ssehub.kernel_haven.config.DefaultSettings;
 import net.ssehub.kernel_haven.incremental.analysis.IncrementalDeadCodeFinder.DeadCodeBlock;
+import net.ssehub.kernel_haven.incremental.settings.IncrementalAnalysisSettings;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache.ChangeFlag;
 import net.ssehub.kernel_haven.undead_analyzer.FormulaRelevancyChecker;
@@ -37,13 +38,13 @@ import net.ssehub.kernel_haven.util.null_checks.NonNull;
 import net.ssehub.kernel_haven.util.null_checks.Nullable;
 import net.ssehub.kernel_haven.variability_model.VariabilityModel;
 
-// TODO: Auto-generated Javadoc
 /**
  * A simple implementation for dead code detection.
  * 
  * @author Adam, Moritz
  */
-public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> {
+public class IncrementalDeadCodeFinder
+    extends AnalysisComponent<DeadCodeBlock> {
 
     /** The consider vm vars only. */
     protected boolean considerVmVarsOnly;
@@ -67,6 +68,8 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 
     protected boolean variabilityModelChanged;
 
+    protected boolean buildModelOptimization;
+
     protected boolean buildModelChanged;
 
     protected @NonNull HybridCache hybridCache;
@@ -85,9 +88,10 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         super(config);
 
         this.hybridCache = hybridCache;
-
         considerVmVarsOnly = config
             .getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
+        buildModelOptimization = config
+            .getValue(IncrementalAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
     }
 
     /**
@@ -144,13 +148,18 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 
         Formula filePc = bm.getPc(sourceFile.getPath());
 
+        boolean runForFile = true;
+
         // skip files with no presence condition
-        boolean runForFile = filePc != null;
-        if (!runForFile) {
+        if (filePc == null) {
+            runForFile = false;
             LOGGER.logInfo("Skipping " + sourceFile.getPath()
                 + " because it has no build PC");
-        } else if (buildModelChanged && !variabilityModelChanged
-            && previousBm != null) {
+
+            // TODO: Make this optimization a selectable option
+        } else if (buildModelOptimization && buildModelChanged
+            && !variabilityModelChanged && previousBm != null) {
+
             Collection<ChangeFlag> flagsForCodeFile =
                 hybridCache.getFlags(sourceFile);
 
@@ -160,7 +169,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
                 Formula previousFilePc = previousBm.getPc(sourceFile.getPath());
                 runForFile = !filePc.equals(previousFilePc);
                 LOGGER.logInfo("Skipping " + sourceFile.getPath()
-                + " because its presence condition did not change.");
+                    + " because its presence condition did not change.");
             }
         }
 

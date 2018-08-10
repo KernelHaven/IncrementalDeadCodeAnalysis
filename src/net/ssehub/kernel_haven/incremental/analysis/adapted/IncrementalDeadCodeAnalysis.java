@@ -1,4 +1,4 @@
-package net.ssehub.kernel_haven.incremental.analysis;
+package net.ssehub.kernel_haven.incremental.analysis.adapted;
 
 import net.ssehub.kernel_haven.SetUpException;
 import net.ssehub.kernel_haven.analysis.AnalysisComponent;
@@ -13,7 +13,7 @@ import net.ssehub.kernel_haven.util.Logger;
 
 // TODO: Auto-generated Javadoc
 /**
- * Incremental implementation of the {@link DeadCodeAnalysis}.
+ * Incremental implementation of the {@link DeadCodeAnalysis} using the {@link HybridCacheAdapter}.
  *
  * @author Moritz
  */
