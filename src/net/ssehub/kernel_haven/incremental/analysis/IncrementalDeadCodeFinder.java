@@ -43,8 +43,7 @@ import net.ssehub.kernel_haven.variability_model.VariabilityModel;
  * 
  * @author Adam, Moritz
  */
-public class IncrementalDeadCodeFinder
-    extends AnalysisComponent<DeadCodeBlock> {
+public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> {
 
     /** The consider vm vars only. */
     protected boolean considerVmVarsOnly;
@@ -78,26 +77,21 @@ public class IncrementalDeadCodeFinder
      * Creates a dead code analysis.
      * 
      *
-     * @param config
-     *            The user configuration; not used.
-     * @param hybridCache
-     *            the hybrid cache
+     * @param config      The user configuration; not used.
+     * @param hybridCache the hybrid cache
      */
-    public IncrementalDeadCodeFinder(@NonNull Configuration config,
-        @NonNull HybridCache hybridCache) {
+    public IncrementalDeadCodeFinder(@NonNull Configuration config, @NonNull HybridCache hybridCache) {
         super(config);
 
         this.hybridCache = hybridCache;
-        considerVmVarsOnly = config
-            .getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
-        buildModelOptimization = config
-            .getValue(IncrementalAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
+        considerVmVarsOnly = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
+        buildModelOptimization = config.getValue(IncrementalAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
     }
 
     /**
-     * A class that holds all variables relevant for solving SAT. This is
-     * created once per {@link DeadCodeFinder#findDeadCodeBlocks(SourceFile))},
-     * so that this method is thread-safe.
+     * A class that holds all variables relevant for solving SAT. This is created
+     * once per {@link DeadCodeFinder#findDeadCodeBlocks(SourceFile))}, so that this
+     * method is thread-safe.
      */
     private static class SatUtilities {
 
@@ -113,16 +107,12 @@ public class IncrementalDeadCodeFinder
         /**
          * Creates this instance.
          * 
-         * @param converter
-         *            the formula to CNF converter.
-         * @param solver
-         *            The SAT solver.
-         * @param satCache
-         *            The SAT cache.
+         * @param converter the formula to CNF converter.
+         * @param solver    The SAT solver.
+         * @param satCache  The SAT cache.
          */
-        SatUtilities(@NonNull IFormulaToCnfConverter converter,
-            @NonNull SatSolver solver,
-            @NonNull Map<Formula, Boolean> satCache) {
+        SatUtilities(@NonNull IFormulaToCnfConverter converter, @NonNull SatSolver solver,
+                @NonNull Map<Formula, Boolean> satCache) {
             this.converter = converter;
             this.solver = solver;
             this.satCache = satCache;
@@ -133,18 +123,15 @@ public class IncrementalDeadCodeFinder
     /**
      * Finds dead code blocks. This method is thread-safe.
      * 
-     * @param sourceFile
-     *            The source file to search in.
+     * @param sourceFile The source file to search in.
      * @return The list of dead code blocks.
      */
-    protected @NonNull List<@NonNull DeadCodeBlock> findDeadCodeBlocks(
-        @NonNull SourceFile sourceFile) {
+    protected @NonNull List<@NonNull DeadCodeBlock> findDeadCodeBlocks(@NonNull SourceFile sourceFile) {
 
         List<@NonNull DeadCodeBlock> result = new ArrayList<>();
 
-        SatUtilities satUtils = new SatUtilities(
-            FormulaToCnfConverterFactory.create(Strategy.RECURISVE_REPLACING),
-            new SatSolver(notNull(vmCnf)), new HashMap<>(10000));
+        SatUtilities satUtils = new SatUtilities(FormulaToCnfConverterFactory.create(Strategy.RECURISVE_REPLACING),
+                new SatSolver(notNull(vmCnf)), new HashMap<>(10000));
 
         Formula filePc = bm.getPc(sourceFile.getPath());
 
@@ -153,23 +140,22 @@ public class IncrementalDeadCodeFinder
         // skip files with no presence condition
         if (filePc == null) {
             runForFile = false;
-            LOGGER.logInfo("Skipping " + sourceFile.getPath()
-                + " because it has no build PC");
+            LOGGER.logInfo("Skipping " + sourceFile.getPath() + " because it has no build PC");
 
             // TODO: Make this optimization a selectable option
-        } else if (buildModelOptimization && buildModelChanged
-            && !variabilityModelChanged && previousBm != null) {
+        } else if (buildModelOptimization && buildModelChanged && !variabilityModelChanged && previousBm != null) {
 
-            Collection<ChangeFlag> flagsForCodeFile =
-                hybridCache.getFlags(sourceFile);
+            Collection<ChangeFlag> flagsForCodeFile = hybridCache.getFlags(sourceFile);
 
             // we can only consider removing files from pc-checking when they
             // were not newly extracted
             if (!flagsForCodeFile.contains(ChangeFlag.EXTRACTION_CHANGE)) {
                 Formula previousFilePc = previousBm.getPc(sourceFile.getPath());
                 runForFile = !filePc.equals(previousFilePc);
-                LOGGER.logInfo("Skipping " + sourceFile.getPath()
-                    + " because its presence condition did not change.");
+                if (runForFile) {
+                    LOGGER.logInfo(
+                            "Skipping " + sourceFile.getPath() + " because its presence condition did not change.");
+                }
             }
         }
 
@@ -181,8 +167,7 @@ public class IncrementalDeadCodeFinder
                 try {
                     checkElement(element, filePc, sourceFile, satUtils, result);
                 } catch (SolverException | ConverterException e) {
-                    LOGGER.logException(
-                        "Exception while trying to check element", e);
+                    LOGGER.logException("Exception while trying to check element", e);
                 }
             }
         }
@@ -191,24 +176,20 @@ public class IncrementalDeadCodeFinder
     }
 
     /**
-     * Checks whether the given formula is satisfiable with the variability
-     * model. Internally, this method has a cache to speed up when the same
-     * formula is passed to it several times.
+     * Checks whether the given formula is satisfiable with the variability model.
+     * Internally, this method has a cache to speed up when the same formula is
+     * passed to it several times.
      * 
-     * @param pc
-     *            The formula to check.
-     * @param satUtils
-     *            The sat utils to use.
+     * @param pc       The formula to check.
+     * @param satUtils The sat utils to use.
      * 
      * @return Whether the formula is satisfiable with the variability model.
      * 
-     * @throws ConverterException
-     *             If the conversion to CNF fails.
-     * @throws SolverException
-     *             If the SAT-solver fails.
+     * @throws ConverterException If the conversion to CNF fails.
+     * @throws SolverException    If the SAT-solver fails.
      */
     private boolean isSat(@NonNull Formula pc, @NonNull SatUtilities satUtils)
-        throws ConverterException, SolverException {
+            throws ConverterException, SolverException {
 
         Boolean sat = satUtils.satCache.get(pc);
 
@@ -230,36 +211,25 @@ public class IncrementalDeadCodeFinder
     }
 
     /**
-     * Checks if a given element is dead. Recursively walks over each child
-     * element, too.
+     * Checks if a given element is dead. Recursively walks over each child element,
+     * too.
      * 
-     * @param element
-     *            The element to check.
-     * @param filePc
-     *            The presence condition of the file.
-     * @param sourceFile
-     *            The source file; used for creating the result.
-     * @param satUtils
-     *            The SAT utils to use.
-     * @param result
-     *            The list to add result {@link DeadCodeBlock}s to.
+     * @param element    The element to check.
+     * @param filePc     The presence condition of the file.
+     * @param sourceFile The source file; used for creating the result.
+     * @param satUtils   The SAT utils to use.
+     * @param result     The list to add result {@link DeadCodeBlock}s to.
      * 
-     * @throws ConverterException
-     *             If converting the formula to CNF fails.
-     * @throws SolverException
-     *             If solving the CNF fails.
+     * @throws ConverterException If converting the formula to CNF fails.
+     * @throws SolverException    If solving the CNF fails.
      */
-    private void checkElement(@NonNull CodeElement element,
-        @NonNull Formula filePc, @NonNull SourceFile sourceFile,
-        @NonNull SatUtilities satUtils,
-        @NonNull List<@NonNull DeadCodeBlock> result)
-        throws ConverterException, SolverException {
+    private void checkElement(@NonNull CodeElement element, @NonNull Formula filePc, @NonNull SourceFile sourceFile,
+            @NonNull SatUtilities satUtils, @NonNull List<@NonNull DeadCodeBlock> result)
+            throws ConverterException, SolverException {
 
         Formula pc = new Conjunction(element.getPresenceCondition(), filePc);
         FormulaRelevancyChecker checker = this.relevancyChecker;
-        boolean considerBlock =
-            checker != null ? checker.visit(element.getPresenceCondition())
-                : true;
+        boolean considerBlock = checker != null ? checker.visit(element.getPresenceCondition()) : true;
 
         if (considerBlock && !isSat(pc, satUtils)) {
             DeadCodeBlock deadBlock = new DeadCodeBlock(element, filePc);
@@ -296,10 +266,8 @@ public class IncrementalDeadCodeFinder
         /**
          * Creates a dead code block.
          * 
-         * @param sourceFile
-         *            The source file.
-         * @param line
-         *            The line of the element.
+         * @param sourceFile The source file.
+         * @param line       The line of the element.
          */
         public DeadCodeBlock(@NonNull File sourceFile, int line) {
             this.sourceFile = sourceFile;
@@ -310,17 +278,14 @@ public class IncrementalDeadCodeFinder
         }
 
         /**
-         * Converts a {@link CodeElement} into a {@link DeadCodeBlock}. This
-         * constructor stores more information.
+         * Converts a {@link CodeElement} into a {@link DeadCodeBlock}. This constructor
+         * stores more information.
          * 
-         * @param deadElement
-         *            An element which was identified to be dead.
-         * @param filePc
-         *            The presence condition for the complete file, maybe
-         *            <tt>null</tt>
+         * @param deadElement An element which was identified to be dead.
+         * @param filePc      The presence condition for the complete file, maybe
+         *                    <tt>null</tt>
          */
-        public DeadCodeBlock(@NonNull CodeElement deadElement,
-            @NonNull Formula filePc) {
+        public DeadCodeBlock(@NonNull CodeElement deadElement, @NonNull Formula filePc) {
             this(deadElement.getSourceFile(), deadElement.getLineStart());
             this.endLine = deadElement.getLineEnd();
             this.presenceCondition = deadElement.getPresenceCondition();
@@ -417,13 +382,11 @@ public class IncrementalDeadCodeFinder
             vm = hybridCache.readVm();
             bm = hybridCache.readBm();
             Collection<ChangeFlag> bmFlags = hybridCache.getBmFlags();
-            this.buildModelChanged = bmFlags.contains(ChangeFlag.ADDITION)
-                || bmFlags.contains(ChangeFlag.MODIFICATION)
-                || bmFlags.contains(ChangeFlag.DELETION);
+            this.buildModelChanged = bmFlags.contains(ChangeFlag.ADDITION) || bmFlags.contains(ChangeFlag.MODIFICATION)
+                    || bmFlags.contains(ChangeFlag.DELETION);
             Collection<ChangeFlag> vmFlags = hybridCache.getBmFlags();
-            this.buildModelChanged = vmFlags.contains(ChangeFlag.ADDITION)
-                || vmFlags.contains(ChangeFlag.MODIFICATION)
-                || vmFlags.contains(ChangeFlag.DELETION);
+            this.buildModelChanged = vmFlags.contains(ChangeFlag.ADDITION) || vmFlags.contains(ChangeFlag.MODIFICATION)
+                    || vmFlags.contains(ChangeFlag.DELETION);
 
             // if bm or cm changed, we need the entire code model
             if (buildModelChanged || variabilityModelChanged) {
@@ -431,8 +394,7 @@ public class IncrementalDeadCodeFinder
             } else {
                 // if bm and cm remained the same, we only need the newly
                 // extracted parts of the code model
-                cm = hybridCache.readCm(hybridCache
-                    .getCmPathsForFlag(ChangeFlag.EXTRACTION_CHANGE));
+                cm = hybridCache.readCm(hybridCache.getCmPathsForFlag(ChangeFlag.EXTRACTION_CHANGE));
             }
 
         } catch (FormatException | IOException exc) {
@@ -452,13 +414,11 @@ public class IncrementalDeadCodeFinder
                                                                         // execute()
 
             if (considerVmVarsOnly) {
-                relevancyChecker =
-                    new FormulaRelevancyChecker(vm, considerVmVarsOnly);
+                relevancyChecker = new FormulaRelevancyChecker(vm, considerVmVarsOnly);
             }
 
             for (SourceFile sourceFile : cm) {
-                List<@NonNull DeadCodeBlock> deadBlocks =
-                    findDeadCodeBlocks(sourceFile);
+                List<@NonNull DeadCodeBlock> deadBlocks = findDeadCodeBlocks(sourceFile);
                 for (DeadCodeBlock block : deadBlocks) {
                     addResult(block);
                 }
