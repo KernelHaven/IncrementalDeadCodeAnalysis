@@ -152,7 +152,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             if (!flagsForCodeFile.contains(ChangeFlag.EXTRACTION_CHANGE)) {
                 Formula previousFilePc = previousBm.getPc(sourceFile.getPath());
                 runForFile = !filePc.equals(previousFilePc);
-                if (runForFile) {
+                if (!runForFile) {
                     LOGGER.logInfo(
                             "Skipping " + sourceFile.getPath() + " because its presence condition did not change.");
                 }
