@@ -101,7 +101,7 @@ public class IncrementalThreadedDeadCodeFinder
                     new FormulaRelevancyChecker(vm, considerVmVarsOnly);
             }
 
-            OrderPreservingParallelizer<SourceFile, List<@NonNull DeadCodeBlock>> parallelizer =
+            OrderPreservingParallelizer<SourceFile<?>, List<@NonNull DeadCodeBlock>> parallelizer =
                 new OrderPreservingParallelizer<>(this::findDeadCodeBlocks,
                     (deadBlocks) -> {
                         for (DeadCodeBlock block : deadBlocks) {
@@ -110,7 +110,7 @@ public class IncrementalThreadedDeadCodeFinder
                     }, numThreads);
 
 
-            for (SourceFile sourceFile : cm) {
+            for (SourceFile<?> sourceFile : cm) {
                 parallelizer.add(sourceFile);
             }
 

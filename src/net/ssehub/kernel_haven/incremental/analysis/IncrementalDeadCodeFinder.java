@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -56,7 +57,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	protected VariabilityModel vm;
 
 	/** The code model. */
-	protected Collection<SourceFile> cm;
+	protected Collection<SourceFile<?>> cm;
 
 	/** The vm cnf. */
 	protected Cnf vmCnf;
@@ -127,7 +128,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	 * @param sourceFile The source file to search in.
 	 * @return The list of dead code blocks.
 	 */
-	protected @NonNull List<@NonNull DeadCodeBlock> findDeadCodeBlocks(@NonNull SourceFile sourceFile) {
+	protected @NonNull List<@NonNull DeadCodeBlock> findDeadCodeBlocks(@NonNull SourceFile<?> sourceFile) {
 
 		List<@NonNull DeadCodeBlock> result = new ArrayList<>();
 
@@ -164,12 +165,13 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 			LOGGER.logInfo("Running for file " + sourceFile.getPath());
 			LOGGER.logDebug("File PC: " + filePc);
 
-			for (CodeElement element : sourceFile) {
+			for (CodeElement<?> element : sourceFile) {
 				try {
 					checkElement(element, filePc, sourceFile, satUtils, result);
 				} catch (SolverException | ConverterException e) {
 					LOGGER.logException("Exception while trying to check element", e);
 				}
+
 			}
 		}
 
@@ -224,9 +226,9 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	 * @throws ConverterException If converting the formula to CNF fails.
 	 * @throws SolverException    If solving the CNF fails.
 	 */
-	private void checkElement(@NonNull CodeElement element, @NonNull Formula filePc, @NonNull SourceFile sourceFile,
-			@NonNull SatUtilities satUtils, @NonNull List<@NonNull DeadCodeBlock> result)
-			throws ConverterException, SolverException {
+	private void checkElement(@NonNull CodeElement<?> element, @NonNull Formula filePc,
+			@NonNull SourceFile<?> sourceFile, @NonNull SatUtilities satUtils,
+			@NonNull List<@NonNull DeadCodeBlock> result) throws ConverterException, SolverException {
 
 		Formula pc = new Conjunction(element.getPresenceCondition(), filePc);
 		FormulaRelevancyChecker checker = this.relevancyChecker;
@@ -237,8 +239,9 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 			LOGGER.logInfo("Found dead block: " + deadBlock);
 			result.add(deadBlock);
 		}
-
-		for (CodeElement child : element.iterateNestedElements()) {
+		int nestedCount = element.getNestedElementCount();
+		for (int i = 0; i < nestedCount; i++) {
+			CodeElement<?> child = element.getNestedElement(i);
 			checkElement(child, filePc, sourceFile, satUtils, result);
 		}
 	}
@@ -286,7 +289,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 		 * @param filePc      The presence condition for the complete file, maybe
 		 *                    <tt>null</tt>
 		 */
-		public DeadCodeBlock(@NonNull CodeElement deadElement, @NonNull Formula filePc) {
+		public DeadCodeBlock(@NonNull CodeElement<?> deadElement, @NonNull Formula filePc) {
 			this(deadElement.getSourceFile(), deadElement.getLineStart());
 			this.endLine = deadElement.getLineEnd();
 			this.presenceCondition = deadElement.getPresenceCondition();
@@ -418,7 +421,11 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 				relevancyChecker = new FormulaRelevancyChecker(vm, considerVmVarsOnly);
 			}
 
-			for (SourceFile sourceFile : cm) {
+			Iterator<SourceFile<?>> iterator = cm.iterator();
+			while (iterator.hasNext()) {
+				@NonNull
+				SourceFile<?> sourceFile = iterator.next();
+
 				List<@NonNull DeadCodeBlock> deadBlocks = findDeadCodeBlocks(sourceFile);
 				for (DeadCodeBlock block : deadBlocks) {
 					addResult(block);
