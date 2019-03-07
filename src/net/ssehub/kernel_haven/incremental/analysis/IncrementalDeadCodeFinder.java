@@ -75,6 +75,9 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 
 	protected @NonNull HybridCache hybridCache;
 
+	@NonNull
+	protected AnalysisComponent<HybridCache> postExtraction;
+
 	/**
 	 * Creates a dead code analysis.
 	 * 
@@ -82,10 +85,10 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	 * @param config      The user configuration; not used.
 	 * @param hybridCache the hybrid cache
 	 */
-	public IncrementalDeadCodeFinder(@NonNull Configuration config, @NonNull HybridCache hybridCache) {
+	public IncrementalDeadCodeFinder(@NonNull Configuration config,
+			@NonNull AnalysisComponent<HybridCache> postExtraction) {
 		super(config);
-
-		this.hybridCache = hybridCache;
+		this.postExtraction = postExtraction;
 		considerVmVarsOnly = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
 		buildModelOptimization = config.getValue(IncrementalAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
 	}
@@ -381,6 +384,8 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	 */
 	@Override
 	protected void execute() {
+		this.hybridCache = this.postExtraction.getNextResult();
+
 		try {
 			// TODO: check which models changed and read Cm accordingly
 			vm = hybridCache.readVm();
