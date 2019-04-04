@@ -7,11 +7,10 @@ import net.ssehub.kernel_haven.config.Configuration;
 import net.ssehub.kernel_haven.incremental.storage.IncrementalPostExtraction;
 import net.ssehub.kernel_haven.util.null_checks.NonNull;
 
-public class IncrementalThreadedDeadCodeAnalysis extends PipelineAnalysis{
+public class IncrementalThreadedDeadCodeAnalysis extends PipelineAnalysis {
 
 	public IncrementalThreadedDeadCodeAnalysis(@NonNull Configuration config) {
 		super(config);
-		// TODO Auto-generated constructor stub
 	}
 
 	@Override

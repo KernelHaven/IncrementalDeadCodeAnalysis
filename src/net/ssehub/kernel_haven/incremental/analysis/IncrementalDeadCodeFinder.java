@@ -27,7 +27,6 @@ import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.config.Configuration;
 import net.ssehub.kernel_haven.config.DefaultSettings;
 import net.ssehub.kernel_haven.incremental.analysis.IncrementalDeadCodeFinder.DeadCodeBlock;
-import net.ssehub.kernel_haven.incremental.settings.IncrementalAnalysisSettings;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache.ChangeFlag;
 import net.ssehub.kernel_haven.undead_analyzer.FormulaRelevancyChecker;
@@ -40,6 +39,7 @@ import net.ssehub.kernel_haven.util.null_checks.NonNull;
 import net.ssehub.kernel_haven.util.null_checks.Nullable;
 import net.ssehub.kernel_haven.variability_model.VariabilityModel;
 
+// TODO: Auto-generated Javadoc
 /**
  * A simple implementation for dead code detection.
  * 
@@ -65,32 +65,41 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	/** The bm. */
 	protected BuildModel bm;
 
+	/** The previous bm. */
 	protected BuildModel previousBm;
 
+	/** The variability model changed. */
 	protected boolean variabilityModelChanged;
 
+	/** The build model optimization. */
 	protected boolean buildModelOptimization;
 
+	/** The build model changed. */
 	protected boolean buildModelChanged;
 
+	/** The hybrid cache. */
 	protected @NonNull HybridCache hybridCache;
 
+	/** The post extraction. */
 	@NonNull
 	protected AnalysisComponent<HybridCache> postExtraction;
 
+	/** The code model config only. */
+	protected Boolean codeModelConfigOnly;
+
 	/**
 	 * Creates a dead code analysis.
-	 * 
 	 *
-	 * @param config      The user configuration; not used.
-	 * @param hybridCache the hybrid cache
+	 * @param config         The user configuration; not used.
+	 * @param postExtraction the post extraction
 	 */
 	public IncrementalDeadCodeFinder(@NonNull Configuration config,
 			@NonNull AnalysisComponent<HybridCache> postExtraction) {
 		super(config);
 		this.postExtraction = postExtraction;
 		considerVmVarsOnly = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
-		buildModelOptimization = config.getValue(IncrementalAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
+		buildModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
+		codeModelConfigOnly = config.getValue(IncrementalDeadCodeAnalysisSettings.CODE_MODEL_CONFIG_ONLY);
 	}
 
 	/**
@@ -147,11 +156,9 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 			runForFile = false;
 			LOGGER.logInfo("Skipping " + sourceFile.getPath() + " because it has no build PC");
 
-			// TODO: Make this optimization a selectable option
 		} else if (buildModelOptimization && buildModelChanged && !variabilityModelChanged && previousBm != null) {
 
 			Collection<ChangeFlag> flagsForCodeFile = hybridCache.getFlags(sourceFile);
-
 			// we can only consider removing files from pc-checking when they
 			// were not newly extracted
 			if (!flagsForCodeFile.contains(ChangeFlag.EXTRACTION_CHANGE)) {
@@ -380,17 +387,18 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	}
 
 	/**
-	 * Execute.
+	 * Load models from hybrid cache according to the situation required for the
+	 * analysis.
 	 */
-	@Override
-	protected void execute() {
-		this.hybridCache = this.postExtraction.getNextResult();
-
+	protected void loadModelsFromHybridCache() {
+		this.hybridCache = postExtraction.getNextResult();
 		try {
-			// TODO: check which models changed and read Cm accordingly
+
 			vm = hybridCache.readVm();
 			bm = hybridCache.readBm();
+
 			Collection<ChangeFlag> bmFlags = hybridCache.getBmFlags();
+
 			this.buildModelChanged = bmFlags.contains(ChangeFlag.ADDITION) || bmFlags.contains(ChangeFlag.MODIFICATION)
 					|| bmFlags.contains(ChangeFlag.DELETION);
 			Collection<ChangeFlag> vmFlags = hybridCache.getBmFlags();
@@ -404,11 +412,31 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 				// if bm and cm remained the same, we only need the newly
 				// extracted parts of the code model
 				cm = hybridCache.readCm(hybridCache.getCmPathsForFlag(ChangeFlag.EXTRACTION_CHANGE));
+
+			}
+
+			// Only consider code blocks with relation to variability if the option is
+			// selected
+			if (cm != null && !cm.isEmpty() && codeModelConfigOnly) {
+				Collection<SourceFile<?>> convertedSourceFiles = new ArrayList<SourceFile<?>>();
+				for (SourceFile<?> sourceFile : cm) {
+					convertedSourceFiles.add(new ConfigOnlySourceFile(sourceFile));
+				}
+				cm = convertedSourceFiles;
 			}
 
 		} catch (FormatException | IOException exc) {
 			exc.printStackTrace();
 		}
+	}
+
+	/**
+	 * Execute.
+	 */
+	@Override
+	protected void execute() {
+
+		loadModelsFromHybridCache();
 
 		if (vm == null || bm == null || cm == null) {
 			LOGGER.logError("Couldn't get models");
@@ -416,11 +444,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 		}
 
 		try {
-			vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm)); // vm
-																		// was
-																		// initialized
-																		// in
-																		// execute()
+			vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
 			if (considerVmVarsOnly) {
 				relevancyChecker = new FormulaRelevancyChecker(vm, considerVmVarsOnly);
