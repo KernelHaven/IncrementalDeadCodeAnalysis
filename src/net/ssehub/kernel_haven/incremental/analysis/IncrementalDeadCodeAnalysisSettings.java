@@ -15,16 +15,24 @@ import net.ssehub.kernel_haven.undead_analyzer.ThreadedDeadCodeFinder;
 import net.ssehub.kernel_haven.util.Logger;
 import net.ssehub.kernel_haven.util.null_checks.NonNull;
 
+// TODO: Auto-generated Javadoc
+/**
+ * The Class IncrementalDeadCodeAnalysisSettings.
+ */
 public class IncrementalDeadCodeAnalysisSettings {
 
-	public static final Setting<Boolean> CODE_MODEL_CONFIG_ONLY = new Setting<Boolean>(
-			"incremental.code.pass_config_blocks_exclusively", BOOLEAN, true, "FALSE",
-			"defines if only code blocks with CONFIG_ variables are passed to the "
-					+ "analysis through the HybridCacheAdapter");
+	/** The Constant VARIABILITY_RELATED_BLOCKS_ONLY. */
+	public static final Setting<Boolean> VARIABILITY_RELATED_BLOCKS_ONLY = new Setting<Boolean>(
+			"analysis.variability_related_blocks_only", BOOLEAN, true, "FALSE",
+			"defines if only code blocks with CONFIG_ variables are considered for the analysis");
+
+	/** The Constant BUILD_MODEL_OPTIMIZATION. */
 	public static final Setting<Boolean> BUILD_MODEL_OPTIMIZATION = new Setting<>(
 			"incremental.analysis.build_model.optimization", BOOLEAN, true, "FALSE",
 			"This setting determines whether information about the differences in the build model"
 					+ " compared with the previous build model should be used to reduce the computational effort.");
+
+	/** The Constant NUMBER_OF_THREADS. */
 	public static final @NonNull Setting<@NonNull Integer> NUMBER_OF_THREADS = new Setting<>("analysis.undead.threads",
 			Setting.Type.INTEGER, true, "2",
 			"Number of threads to use for the " + ThreadedDeadCodeFinder.class.getName() + ". Must be >= 1.");

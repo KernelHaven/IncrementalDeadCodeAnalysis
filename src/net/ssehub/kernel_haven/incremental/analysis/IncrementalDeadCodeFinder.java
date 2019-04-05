@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import net.ssehub.kernel_haven.analysis.AnalysisComponent;
 import net.ssehub.kernel_haven.build_model.BuildModel;
@@ -85,7 +87,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 	protected AnalysisComponent<HybridCache> postExtraction;
 
 	/** The code model config only. */
-	protected Boolean codeModelConfigOnly;
+	protected boolean considerOnlyVariabilityRelatedCodeBlocks;
 
 	/**
 	 * Creates a dead code analysis.
@@ -99,7 +101,8 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 		this.postExtraction = postExtraction;
 		considerVmVarsOnly = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
 		buildModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
-		codeModelConfigOnly = config.getValue(IncrementalDeadCodeAnalysisSettings.CODE_MODEL_CONFIG_ONLY);
+		considerOnlyVariabilityRelatedCodeBlocks = config
+				.getValue(IncrementalDeadCodeAnalysisSettings.VARIABILITY_RELATED_BLOCKS_ONLY);
 	}
 
 	/**
@@ -244,6 +247,8 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 		FormulaRelevancyChecker checker = this.relevancyChecker;
 		boolean considerBlock = checker != null ? checker.visit(element.getPresenceCondition()) : true;
 
+		considerBlock = considerBlock
+				&& (!considerOnlyVariabilityRelatedCodeBlocks || checkRelationToVariability(element.getCondition()));
 		if (considerBlock && !isSat(pc, satUtils)) {
 			DeadCodeBlock deadBlock = new DeadCodeBlock(element, filePc);
 			LOGGER.logInfo("Found dead block: " + deadBlock);
@@ -254,6 +259,19 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 			CodeElement<?> child = element.getNestedElement(i);
 			checkElement(child, filePc, sourceFile, satUtils, result);
 		}
+	}
+
+	/**
+	 * Check relation of a given formula to variability. A condition is considered
+	 * to be related to variability if it contains a CONFIG_-Variable
+	 *
+	 * @param formula the given condition
+	 * @return true, if relation to variability is identified
+	 */
+	private boolean checkRelationToVariability(Formula formula) {
+		Pattern pattern = Pattern.compile("(?<!(_|\\w|\\d))CONFIG_");
+		Matcher matcher = pattern.matcher(formula.toString());
+		return matcher.find();
 	}
 
 	/**
@@ -413,16 +431,6 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 				// extracted parts of the code model
 				cm = hybridCache.readCm(hybridCache.getCmPathsForFlag(ChangeFlag.EXTRACTION_CHANGE));
 
-			}
-
-			// Only consider code blocks with relation to variability if the option is
-			// selected
-			if (cm != null && !cm.isEmpty() && codeModelConfigOnly) {
-				Collection<SourceFile<?>> convertedSourceFiles = new ArrayList<SourceFile<?>>();
-				for (SourceFile<?> sourceFile : cm) {
-					convertedSourceFiles.add(new ConfigOnlySourceFile(sourceFile));
-				}
-				cm = convertedSourceFiles;
 			}
 
 		} catch (FormatException | IOException exc) {
