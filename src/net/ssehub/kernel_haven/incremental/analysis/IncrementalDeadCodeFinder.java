@@ -99,7 +99,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             @NonNull AnalysisComponent<HybridCache> postExtraction) {
         super(config);
         this.postExtraction = postExtraction;
-        usageOfVmVariables = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
+
         buildModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
     }
 
