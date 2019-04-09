@@ -7,7 +7,6 @@ import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.undead_analyzer.FormulaRelevancyChecker;
 import net.ssehub.kernel_haven.variability_model.VariabilityModel;
 
-// TODO: Auto-generated Javadoc
 /**
  * The Class CodeFileComparator.
  * 
@@ -81,10 +80,36 @@ public class SourceFileChangeDetector {
      * @param varModel the var model
      */
     private void reduceSourceFile(SourceFile<?> file, VariabilityModel varModel) {
-        // TODO Idea reduce source file so that it only contains blocks with
+        // TODO Idea: reduce source file so that it only contains blocks with
         // dependencies to the variability model
-        FormulaRelevancyChecker checker = new FormulaRelevancyChecker(varModel, true);
+        // Essentially: Cut away all branches that do not depend or contain a relation
+        // to variability
 
+    }
+
+    /**
+     * Checks if is relevant.
+     *
+     * @param element the element
+     * @param checker the checker
+     * @return true, if is relevant
+     */
+    private boolean isRelevant(CodeElement<?> element, FormulaRelevancyChecker checker) {
+        boolean relevance;
+        if (checker.visit(element.getPresenceCondition())) {
+            relevance = true;
+        } else if (element.getNestedElementCount() == 0) {
+            relevance = false;
+        } else {
+            relevance = false;
+            int nestedCount = element.getNestedElementCount();
+            for (int i = 0; !relevance && i < nestedCount; i++) {
+                CodeElement<?> nested = element.getNestedElement(i);
+                relevance = isRelevant(nested, checker);
+
+            }
+        }
+        return false;
     }
 
     /**
@@ -128,7 +153,7 @@ public class SourceFileChangeDetector {
         int fileANestedElementCount = fileAElement.getNestedElementCount();
         int fileBNestedElementCount = fileBElement.getNestedElementCount();
 
-        boolean unchanged = fileAElement.getCondition().equals(fileBElement.getCondition())
+        boolean unchanged = fileAElement.getPresenceCondition().equals(fileBElement.getPresenceCondition())
                 && fileANestedElementCount == fileBNestedElementCount;
 
         for (int i = 0; unchanged && i < fileANestedElementCount; i++) {
