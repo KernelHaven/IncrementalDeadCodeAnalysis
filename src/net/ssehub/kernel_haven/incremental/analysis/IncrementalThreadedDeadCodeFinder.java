@@ -9,9 +9,7 @@ import net.ssehub.kernel_haven.analysis.AnalysisComponent;
 import net.ssehub.kernel_haven.cnf.VmToCnfConverter;
 import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.config.Configuration;
-import net.ssehub.kernel_haven.config.DefaultSettings;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache;
-import net.ssehub.kernel_haven.undead_analyzer.FormulaRelevancyChecker;
 import net.ssehub.kernel_haven.util.FormatException;
 import net.ssehub.kernel_haven.util.OrderPreservingParallelizer;
 import net.ssehub.kernel_haven.util.null_checks.NonNull;
@@ -63,8 +61,8 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
             vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
             // Only consider formulas with relation to variability model
-            if (usageOfVmVariables != null && usageOfVmVariables != DefaultSettings.USAGE_OF_VM_VARS.ALL_ELEMENTS) {
-                relevancyChecker = new FormulaRelevancyChecker(vm, true);
+            if (onlyVariabilyRelatedVariables) {
+                relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
             }
 
             OrderPreservingParallelizer<SourceFile<?>, List<@NonNull DeadCodeBlock>> parallelizer =

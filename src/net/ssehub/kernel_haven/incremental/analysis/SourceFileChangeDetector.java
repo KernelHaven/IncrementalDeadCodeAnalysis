@@ -1,12 +1,16 @@
 package net.ssehub.kernel_haven.incremental.analysis;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import net.ssehub.kernel_haven.code_model.CodeElement;
 import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.undead_analyzer.FormulaRelevancyChecker;
 import net.ssehub.kernel_haven.variability_model.VariabilityModel;
 
+// TODO: Auto-generated Javadoc
 /**
  * The Class CodeFileComparator.
  * 
@@ -63,63 +67,95 @@ public class SourceFileChangeDetector {
             if (this.consideration == Consideration.ANY_CHANGE) {
                 changed = true;
             } else {
+
                 if (this.consideration == Consideration.ONLY_VARIABILITY_CHANGE) {
-                    reduceSourceFile(fileA, varModelA);
-                    reduceSourceFile(fileB, varModelB);
+                    Set<CodeElement<?>> relevancyA =
+                            collectRelevantElements(fileA, new LinuxFormulaRelevancyChecker(varModelA, true));
+                    Set<CodeElement<?>> relevancyB =
+                            collectRelevantElements(fileB, new LinuxFormulaRelevancyChecker(varModelB, true));
+                    changed = !isStructureSame(fileA, fileB, relevancyA, relevancyB);
+                } else {
+                    changed = !isStructureSame(fileA, fileB, null, null);
                 }
-                changed = !isStructureSame(fileA, fileB);
             }
+
         }
         return changed;
     }
 
     /**
-     * Reduce source file.
+     * Collects {@link CodeElement}s that are considered relevant from a given
+     * {@link SourceFile}. If {@link FormulaRelevancyChecker} considers an element
+     * to be relevant, all of its parents as well as children will be considered
+     * relevant as well.
      *
-     * @param file     the file
-     * @param varModel the var model
+     * @param file    the file
+     * @param checker the checker
+     * @return the sets the
      */
-    private void reduceSourceFile(SourceFile<?> file, VariabilityModel varModel) {
-        // TODO Idea: reduce source file so that it only contains blocks with
-        // dependencies to the variability model
-        // Essentially: Cut away all branches that do not depend or contain a relation
-        // to variability
-
+    protected Set<CodeElement<?>> collectRelevantElements(SourceFile<?> file, LinuxFormulaRelevancyChecker checker) {
+        Set<CodeElement<?>> relevantElements = new HashSet<CodeElement<?>>();
+        for (CodeElement<?> element : file) {
+            collectRelevantElements(element, checker, new HashSet<CodeElement<?>>(), new HashSet<CodeElement<?>>(),
+                    relevantElements);
+        }
+        return relevantElements;
     }
 
     /**
-     * Checks if is relevant.
+     * Collects {@link CodeElement}s that are considered relevant from a given
+     * {@link CodeElement}. If {@link FormulaRelevancyChecker} considers an element
+     * to be relevant, all of its parents as well as children will be considered
+     * relevant as well.
      *
-     * @param element the element
-     * @param checker the checker
-     * @return true, if is relevant
+     * @param currentElement           the current element
+     * @param checker                  the checker
+     * @param parents                  the parents
+     * @param directlyRelevantElements the directly relevant elements
+     * @param relevantElements         the relevant elements
      */
-    private boolean isRelevant(CodeElement<?> element, FormulaRelevancyChecker checker) {
-        boolean relevance;
-        if (checker.visit(element.getPresenceCondition())) {
-            relevance = true;
-        } else if (element.getNestedElementCount() == 0) {
-            relevance = false;
-        } else {
-            relevance = false;
-            int nestedCount = element.getNestedElementCount();
-            for (int i = 0; !relevance && i < nestedCount; i++) {
-                CodeElement<?> nested = element.getNestedElement(i);
-                relevance = isRelevant(nested, checker);
+    protected void collectRelevantElements(CodeElement<?> currentElement, LinuxFormulaRelevancyChecker checker,
+            Set<CodeElement<?>> parents, Set<CodeElement<?>> directlyRelevantElements,
+            Set<CodeElement<?>> relevantElements) {
+        // if the path contains an element that is directly relevant,
+        // currentElement is relevant as well.
+        if (!Collections.disjoint(relevantElements, parents)) {
+            relevantElements.add(currentElement);
+            // Otherwise check if the element is relevant on its own (=directly relevant)
+        } else if (checker.visit(currentElement.getPresenceCondition())) {
+            relevantElements.add(currentElement);
+            directlyRelevantElements.add(currentElement);
+            // if the element is element on its own, it also makes all of its parents
+            // relevant
+            relevantElements.addAll(parents);
+        }
 
+        // After the current element itself was handled, take care of its nested
+        // elements
+        int nestedCount = currentElement.getNestedElementCount();
+        if (nestedCount > 0) {
+            // Create a copy of the parent list and add currentElement as a parent
+            Set<CodeElement<?>> newParents = new HashSet<CodeElement<?>>(parents);
+            newParents.add(currentElement);
+            for (int i = 0; i < nestedCount; i++) {
+                CodeElement<?> nestedElement = currentElement.getNestedElement(i);
+                collectRelevantElements(nestedElement, checker, newParents, directlyRelevantElements, relevantElements);
             }
         }
-        return false;
+
     }
 
     /**
      * Checks for changes within the structure of two given source files.
      *
-     * @param fileA the file A
-     * @param fileB the file B
+     * @param fileA      the file A
+     * @param fileB      the file B
+     * @param relevancyA the relevancy A
+     * @param relevancyB the relevancy B
      * @return true, if unchanged
      */
-    private boolean isStructureSame(SourceFile<?> fileA, SourceFile<?> fileB) {
+    protected boolean isStructureSame(SourceFile<?> fileA, SourceFile<?> fileB, Set<CodeElement<?>> relevancyA,
+            Set<CodeElement<?>> relevancyB) {
 
         // The Generic in {@link SourceFile} must be a {@link CodeElement}.
         @SuppressWarnings("unchecked")
@@ -134,7 +170,7 @@ public class SourceFileChangeDetector {
             // confirmed that the number of elements is the same
             CodeElement<?> fileAElement = fileAIterator.next();
             CodeElement<?> fileBElement = fileBIterator.next();
-            unchanged = isStructureSame(fileAElement, fileBElement);
+            unchanged = isStructureSame(fileAElement, fileBElement, relevancyA, relevancyB);
 
         }
         return unchanged;
@@ -146,20 +182,45 @@ public class SourceFileChangeDetector {
      *
      * @param fileAElement the file A element
      * @param fileBElement the file B element
+     * @param relevancyA   the relevancy A
+     * @param relevancyB   the relevancy B
      * @return true, if unchanged
      */
-    private boolean isStructureSame(CodeElement<?> fileAElement, CodeElement<?> fileBElement) {
+    private boolean isStructureSame(CodeElement<?> fileAElement, CodeElement<?> fileBElement,
+            Set<CodeElement<?>> relevancyA, Set<CodeElement<?>> relevancyB) {
 
-        int fileANestedElementCount = fileAElement.getNestedElementCount();
-        int fileBNestedElementCount = fileBElement.getNestedElementCount();
+        boolean unchanged = getNestedCount(fileAElement, relevancyA) == getNestedCount(fileBElement, relevancyB);
 
-        boolean unchanged = fileAElement.getPresenceCondition().equals(fileBElement.getPresenceCondition())
-                && fileANestedElementCount == fileBNestedElementCount;
-
-        for (int i = 0; unchanged && i < fileANestedElementCount; i++) {
-            unchanged = isStructureSame(fileAElement.getNestedElement(i), fileBElement.getNestedElement(i));
-        }
+        unchanged = isStructureSame(fileAElement, fileBElement, relevancyA, relevancyB);
 
         return unchanged;
+    }
+
+    /**
+     * Gets the nested count.
+     *
+     * @param fileElement the file element
+     * @param relevancy   the relevancy
+     * @return the nested count
+     */
+    public int getNestedCount(CodeElement<?> fileElement, Set<CodeElement<?>> relevancy) {
+        int nestedCount;
+        // if no relevancy was determined, we consider all elements to be relevant
+        // children
+        if (relevancy == null) {
+            nestedCount = fileElement.getNestedElementCount();
+
+            // otherwise only those in the relevancy list are considered
+        } else {
+            int allNestedElementsCount = fileElement.getNestedElementCount();
+            nestedCount = 0;
+            for (int i = 0; i < allNestedElementsCount; i++) {
+                if (relevancy.contains(fileElement.getNestedElement(i))) {
+                    nestedCount++;
+                }
+            }
+
+        }
+        return nestedCount;
     }
 }

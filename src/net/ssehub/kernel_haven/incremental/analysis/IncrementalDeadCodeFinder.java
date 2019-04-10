@@ -27,12 +27,9 @@ import net.ssehub.kernel_haven.cnf.VmToCnfConverter;
 import net.ssehub.kernel_haven.code_model.CodeElement;
 import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.config.Configuration;
-import net.ssehub.kernel_haven.config.DefaultSettings;
-import net.ssehub.kernel_haven.config.DefaultSettings.USAGE_OF_VM_VARS;
 import net.ssehub.kernel_haven.incremental.analysis.IncrementalDeadCodeFinder.DeadCodeBlock;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache.ChangeFlag;
-import net.ssehub.kernel_haven.undead_analyzer.FormulaRelevancyChecker;
 import net.ssehub.kernel_haven.util.FormatException;
 import net.ssehub.kernel_haven.util.io.TableElement;
 import net.ssehub.kernel_haven.util.io.TableRow;
@@ -50,10 +47,10 @@ import net.ssehub.kernel_haven.variability_model.VariabilityModel;
  */
 public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> {
 
-    protected USAGE_OF_VM_VARS usageOfVmVariables;
+    protected boolean onlyVariabilyRelatedVariables;
 
     /** The relevancy checker. */
-    protected @Nullable FormulaRelevancyChecker relevancyChecker;
+    protected LinuxFormulaRelevancyChecker relevancyChecker;
 
     /** The vm. */
     protected VariabilityModel vm;
@@ -242,7 +239,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             @NonNull List<@NonNull DeadCodeBlock> result) throws ConverterException, SolverException {
 
         Formula pc = new Conjunction(element.getPresenceCondition(), filePc);
-        FormulaRelevancyChecker checker = this.relevancyChecker;
+        LinuxFormulaRelevancyChecker checker = this.relevancyChecker;
         boolean considerBlock = checker != null ? checker.visit(element.getPresenceCondition()) : true;
 
         considerBlock = considerBlock
@@ -452,8 +449,8 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         try {
             vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
-            if (usageOfVmVariables != null && usageOfVmVariables != DefaultSettings.USAGE_OF_VM_VARS.ALL_ELEMENTS) {
-                relevancyChecker = new FormulaRelevancyChecker(vm, true);
+            if (onlyVariabilyRelatedVariables) {
+                relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
             }
 
             Iterator<SourceFile<?>> iterator = cm.iterator();
