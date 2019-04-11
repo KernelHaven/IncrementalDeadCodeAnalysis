@@ -2,6 +2,7 @@ package net.ssehub.kernel_haven.incremental.analysis;
 
 import static net.ssehub.kernel_haven.util.null_checks.NullHelpers.notNull;
 
+import java.io.IOException;
 import java.util.List;
 
 import net.ssehub.kernel_haven.SetUpException;
@@ -10,6 +11,9 @@ import net.ssehub.kernel_haven.cnf.VmToCnfConverter;
 import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.config.Configuration;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache;
+import net.ssehub.kernel_haven.incremental.util.LinuxFormulaRelevancyChecker;
+import net.ssehub.kernel_haven.incremental.util.SourceFileDifferenceDetector;
+import net.ssehub.kernel_haven.incremental.util.SourceFileDifferenceDetector.Consideration;
 import net.ssehub.kernel_haven.util.FormatException;
 import net.ssehub.kernel_haven.util.OrderPreservingParallelizer;
 import net.ssehub.kernel_haven.util.null_checks.NonNull;
@@ -60,9 +64,20 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
         try {
             vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
-            // Only consider formulas with relation to variability model
+            SourceFileDifferenceDetector detector = null;
+
+            // If only variability related variables should be considered, the
+            // set of considered SourceFile elements is reduced to the source files
+            // that were changed in regards to their variability information
             if (onlyVariabilyRelatedVariables) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
+                try {
+                    detector = new SourceFileDifferenceDetector(Consideration.ONLY_VARIABILITY_CHANGE, vm,
+                            hybridCache.readPreviousVm());
+                } catch (IOException e) {
+                    LOGGER.logException("Could not read previous variability model", e);
+                }
+
             }
 
             OrderPreservingParallelizer<SourceFile<?>, List<@NonNull DeadCodeBlock>> parallelizer =
@@ -73,7 +88,18 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
                     }, numThreads);
 
             for (SourceFile<?> sourceFile : cm) {
-                parallelizer.add(sourceFile);
+                boolean analyzeSourceFile = true;
+                try {
+                    analyzeSourceFile = detector == null
+                            || detector.isDifferent(sourceFile, hybridCache.readCm(sourceFile.getPath()));
+                } catch (IOException e) {
+                    LOGGER.logException("Could not read previous code model for path " + sourceFile.getPath(), e);
+                }
+
+                if (analyzeSourceFile) {
+                    parallelizer.add(sourceFile);
+                }
+
             }
 
             parallelizer.end();

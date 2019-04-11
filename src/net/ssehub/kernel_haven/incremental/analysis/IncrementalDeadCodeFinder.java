@@ -30,6 +30,9 @@ import net.ssehub.kernel_haven.config.Configuration;
 import net.ssehub.kernel_haven.incremental.analysis.IncrementalDeadCodeFinder.DeadCodeBlock;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache.ChangeFlag;
+import net.ssehub.kernel_haven.incremental.util.LinuxFormulaRelevancyChecker;
+import net.ssehub.kernel_haven.incremental.util.SourceFileDifferenceDetector;
+import net.ssehub.kernel_haven.incremental.util.SourceFileDifferenceDetector.Consideration;
 import net.ssehub.kernel_haven.util.FormatException;
 import net.ssehub.kernel_haven.util.io.TableElement;
 import net.ssehub.kernel_haven.util.io.TableRow;
@@ -153,7 +156,6 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         if (filePc == null) {
             runForFile = false;
             LOGGER.logInfo("Skipping " + sourceFile.getPath() + " because it has no build PC");
-
         } else if (buildModelOptimization && buildModelChanged && !variabilityModelChanged && previousBm != null) {
 
             Collection<ChangeFlag> flagsForCodeFile = hybridCache.getFlags(sourceFile);
@@ -449,18 +451,40 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         try {
             vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
+            // If only variability related variables should be considered, the
+            // set of considered SourceFile elements is reduced to the source files
+            // that were changed in regards to their variability information
+            SourceFileDifferenceDetector detector = null;
             if (onlyVariabilyRelatedVariables) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
+                try {
+                    detector = new SourceFileDifferenceDetector(Consideration.ONLY_VARIABILITY_CHANGE, vm,
+                            hybridCache.readPreviousVm());
+                } catch (IOException e) {
+                    LOGGER.logException("Could not read previous variability model", e);
+                }
+
             }
 
             Iterator<SourceFile<?>> iterator = cm.iterator();
             while (iterator.hasNext()) {
+
                 @NonNull
                 SourceFile<?> sourceFile = iterator.next();
+                boolean analyzeSourceFile = true;
+                try {
+                    analyzeSourceFile = detector == null
+                            || detector.isDifferent(sourceFile, hybridCache.readCm(sourceFile.getPath()));
 
-                List<@NonNull DeadCodeBlock> deadBlocks = findDeadCodeBlocks(sourceFile);
-                for (DeadCodeBlock block : deadBlocks) {
-                    addResult(block);
+                } catch (IOException e) {
+                    LOGGER.logException("Could not read previous sourceFile for path " + sourceFile.getPath(), e);
+                }
+
+                if (analyzeSourceFile) {
+                    List<@NonNull DeadCodeBlock> deadBlocks = findDeadCodeBlocks(sourceFile);
+                    for (DeadCodeBlock block : deadBlocks) {
+                        addResult(block);
+                    }
                 }
             }
 
