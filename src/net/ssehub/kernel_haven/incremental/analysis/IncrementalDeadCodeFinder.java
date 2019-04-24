@@ -49,7 +49,7 @@ import net.ssehub.kernel_haven.variability_model.VariabilityModel;
 public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> {
 
     /** The only variabily related variables. */
-    protected boolean onlyConsiderVariabilityRelatedVariables;
+    protected boolean findDcbForVariabilityRelatedPcsOnly;
 
     /** The relevancy checker. */
     protected LinuxFormulaRelevancyChecker relevancyChecker;
@@ -103,7 +103,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         IncrementalDeadCodeAnalysisSettings.registerAllSettings(config);
         this.postExtraction = postExtraction;
 
-        onlyConsiderVariabilityRelatedVariables = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
+        findDcbForVariabilityRelatedPcsOnly = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
         buildModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
         codeModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.CODE_MODEL_OPTIMIZATION);
     }
@@ -451,7 +451,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             // If only variability related variables should be considered, the
             // set of considered SourceFile elements is reduced to the source files
             // that were changed in regards to their variability information
-            if (onlyConsiderVariabilityRelatedVariables) {
+            if (findDcbForVariabilityRelatedPcsOnly) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
             }
 

@@ -65,20 +65,21 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
             vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
             /*
-             * if option to only consider variability related items was selected,
+             * If option to only consider variability related items was selected,
              * instantiate relevancyChecker. Otherwise it remains set to null. The
              * relevancyChecker itself is used within the findDeadCodeBlocks() method and
              * checks every presence condition for its relevance. If the relevancyChecker is
              * null, all blocks will be considered for analysis.
              */
-            if (onlyConsiderVariabilityRelatedVariables) {
+            if (findDcbForVariabilityRelatedPcsOnly) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
             }
 
             /*
-             * if the current code model should be compared with the previous one to detect
-             * differences a detector instance is created that is used to skip all code
-             * files where variability information was not changed.
+             * The SourceFileDifferenceDetector can be used to identify changes between the
+             * current and previous model of a given SourceFile element. Therefore it is
+             * able to reduce the analyzed part of the code model further so that only
+             * elements with relevant changes are analyzed.
              */
             SourceFileDifferenceDetector detector = null;
             boolean reduceCodeModel = false;
@@ -86,8 +87,8 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
                 try {
                     detector = new SourceFileDifferenceDetector(Consideration.ONLY_VARIABILITY_CHANGE, vm,
                             hybridCache.readPreviousVm());
-                    // we can only skip code files if the build and variability model did not change
-                    // otherwise we need to consider all files
+                    // we can only skip SourceCode elements if the build and variability model did
+                    // not change. Otherwise we need to consider all files.
                     reduceCodeModel = !buildModelChanged && !variabilityModelChanged;
                 } catch (IOException e) {
                     LOGGER.logException("Could not read previous variability model", e);
@@ -106,6 +107,10 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
                 boolean analyzeSourceFile = true;
                 if (reduceCodeModel) {
                     try {
+                        /*
+                         * Check if we have to analyze the file by detecting changes between previous
+                         * and current version of codemodel
+                         */
                         analyzeSourceFile =
                                 detector.isDifferent(sourceFile, hybridCache.readPreviousCm(sourceFile.getPath()));
                     } catch (IOException e) {
