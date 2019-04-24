@@ -38,10 +38,9 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
      */
     public IncrementalThreadedDeadCodeFinder(@NonNull Configuration config,
             AnalysisComponent<HybridCache> postExtraction) throws SetUpException {
-
         super(config, postExtraction);
-
         IncrementalDeadCodeAnalysisSettings.registerAllSettings(config);
+
         numThreads = config.getValue(IncrementalDeadCodeAnalysisSettings.NUMBER_OF_THREADS);
 
     }
@@ -57,27 +56,37 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
         loadModelsFromHybridCache();
 
         if (vm == null || bm == null || cm == null) {
-            LOGGER.logError("Couldn't get models");
+            LOGGER.logError("Couldn't get models: ", "got variability model: " + (vm != null),
+                    "got build model: " + (vm != null), "got code model: " + (cm != null));
             return;
         }
 
         try {
             vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
-            SourceFileDifferenceDetector detector = null;
-
-            // If only variability related variables should be considered, the
-            // set of considered SourceFile elements is reduced to the source files
-            // that were changed in regards to their variability information
+            // if option to only consider variability related items was selected,
+            // instantiate relevancyChecker
             if (onlyVariabilyRelatedVariables) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
+            }
+
+            /*
+             * if the current code model should be compared with the previous one to detect
+             * differences a detector instance is created that is used to skip all code
+             * files where variability information was not changed.
+             */
+            SourceFileDifferenceDetector detector = null;
+            boolean reduceCodeModel = false;
+            if (codeModelOptimization) {
                 try {
                     detector = new SourceFileDifferenceDetector(Consideration.ONLY_VARIABILITY_CHANGE, vm,
                             hybridCache.readPreviousVm());
+                    // we can only skip code files if the build and variability model did not change
+                    // otherwise we need to consider all files
+                    reduceCodeModel = !buildModelChanged && !variabilityModelChanged;
                 } catch (IOException e) {
                     LOGGER.logException("Could not read previous variability model", e);
                 }
-
             }
 
             OrderPreservingParallelizer<SourceFile<?>, List<@NonNull DeadCodeBlock>> parallelizer =
@@ -87,19 +96,23 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
                         }
                     }, numThreads);
 
+            // Feed parallelizer with input
             for (SourceFile<?> sourceFile : cm) {
                 boolean analyzeSourceFile = true;
-                try {
-                    analyzeSourceFile = detector == null
-                            || detector.isDifferent(sourceFile, hybridCache.readCm(sourceFile.getPath()));
-                } catch (IOException e) {
-                    LOGGER.logException("Could not read previous code model for path " + sourceFile.getPath(), e);
+                if (reduceCodeModel) {
+                    try {
+                        analyzeSourceFile =
+                                detector.isDifferent(sourceFile, hybridCache.readPreviousCm(sourceFile.getPath()));
+                    } catch (IOException e) {
+                        LOGGER.logException("Could not read previous code model for path " + sourceFile.getPath(), e);
+                    }
                 }
-
                 if (analyzeSourceFile) {
                     parallelizer.add(sourceFile);
+                } else {
+                    LOGGER.logDebug("Skipping " + sourceFile.getPath()
+                            + " because it introduced no variability related changes.");
                 }
-
             }
 
             parallelizer.end();

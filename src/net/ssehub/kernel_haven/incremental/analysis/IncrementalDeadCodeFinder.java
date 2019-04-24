@@ -7,12 +7,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import net.ssehub.kernel_haven.SetUpException;
 import net.ssehub.kernel_haven.analysis.AnalysisComponent;
 import net.ssehub.kernel_haven.build_model.BuildModel;
 import net.ssehub.kernel_haven.cnf.Cnf;
@@ -27,6 +25,7 @@ import net.ssehub.kernel_haven.cnf.VmToCnfConverter;
 import net.ssehub.kernel_haven.code_model.CodeElement;
 import net.ssehub.kernel_haven.code_model.SourceFile;
 import net.ssehub.kernel_haven.config.Configuration;
+import net.ssehub.kernel_haven.config.DefaultSettings;
 import net.ssehub.kernel_haven.incremental.analysis.IncrementalDeadCodeFinder.DeadCodeBlock;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache;
 import net.ssehub.kernel_haven.incremental.storage.HybridCache.ChangeFlag;
@@ -42,7 +41,6 @@ import net.ssehub.kernel_haven.util.null_checks.NonNull;
 import net.ssehub.kernel_haven.util.null_checks.Nullable;
 import net.ssehub.kernel_haven.variability_model.VariabilityModel;
 
-// TODO: Auto-generated Javadoc
 /**
  * A simple implementation for dead code detection.
  * 
@@ -50,6 +48,7 @@ import net.ssehub.kernel_haven.variability_model.VariabilityModel;
  */
 public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> {
 
+    /** The only variabily related variables. */
     protected boolean onlyVariabilyRelatedVariables;
 
     /** The relevancy checker. */
@@ -89,18 +88,24 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
     /** The code model config only. */
     protected boolean considerOnlyVariabilityRelatedCodeBlocks;
 
+    protected boolean codeModelOptimization;
+
     /**
      * Creates a dead code analysis.
      *
      * @param config         The user configuration; not used.
      * @param postExtraction the post extraction
+     * @throws SetUpException the set up exception
      */
     public IncrementalDeadCodeFinder(@NonNull Configuration config,
-            @NonNull AnalysisComponent<HybridCache> postExtraction) {
+            @NonNull AnalysisComponent<HybridCache> postExtraction) throws SetUpException {
         super(config);
+        IncrementalDeadCodeAnalysisSettings.registerAllSettings(config);
         this.postExtraction = postExtraction;
 
+        onlyVariabilyRelatedVariables = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
         buildModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
+        codeModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.CODE_MODEL_OPTIMIZATION);
     }
 
     /**
@@ -155,18 +160,18 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         // skip files with no presence condition
         if (filePc == null) {
             runForFile = false;
-            LOGGER.logInfo("Skipping " + sourceFile.getPath() + " because it has no build PC");
+            LOGGER.logInfo("Skipping " + sourceFile.getPath() + " because it has no build PC.");
         } else if (buildModelOptimization && buildModelChanged && !variabilityModelChanged && previousBm != null) {
 
             Collection<ChangeFlag> flagsForCodeFile = hybridCache.getFlags(sourceFile);
+
             // we can only consider removing files from pc-checking when they
             // were not newly extracted
             if (!flagsForCodeFile.contains(ChangeFlag.EXTRACTION_CHANGE)) {
                 Formula previousFilePc = previousBm.getPc(sourceFile.getPath());
                 runForFile = !filePc.equals(previousFilePc);
                 if (!runForFile) {
-                    LOGGER.logInfo(
-                            "Skipping " + sourceFile.getPath() + " because its presence condition did not change.");
+                    LOGGER.logInfo("Skipping " + sourceFile.getPath() + " because its build PC did not change.");
                 }
             }
         }
@@ -241,11 +246,10 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             @NonNull List<@NonNull DeadCodeBlock> result) throws ConverterException, SolverException {
 
         Formula pc = new Conjunction(element.getPresenceCondition(), filePc);
-        LinuxFormulaRelevancyChecker checker = this.relevancyChecker;
-        boolean considerBlock = checker != null ? checker.visit(element.getPresenceCondition()) : true;
 
-        considerBlock = considerBlock
-                && (!considerOnlyVariabilityRelatedCodeBlocks || checkRelationToVariability(element.getCondition()));
+        boolean considerBlock =
+                this.relevancyChecker != null ? this.relevancyChecker.visit(element.getPresenceCondition()) : true;
+
         if (considerBlock && !isSat(pc, satUtils)) {
             DeadCodeBlock deadBlock = new DeadCodeBlock(element, filePc);
             LOGGER.logInfo("Found dead block: " + deadBlock);
@@ -256,19 +260,6 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             CodeElement<?> child = element.getNestedElement(i);
             checkElement(child, filePc, sourceFile, satUtils, result);
         }
-    }
-
-    /**
-     * Check relation of a given formula to variability. A condition is considered
-     * to be related to variability if it contains a CONFIG_-Variable
-     *
-     * @param formula the given condition
-     * @return true, if relation to variability is identified
-     */
-    private boolean checkRelationToVariability(Formula formula) {
-        Pattern pattern = Pattern.compile("(?<!(_|\\w|\\d))CONFIG_");
-        Matcher matcher = pattern.matcher(formula.toString());
-        return matcher.find();
     }
 
     /**
@@ -414,19 +405,24 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 
             Collection<ChangeFlag> bmFlags = hybridCache.getBmFlags();
 
-            this.buildModelChanged = bmFlags.contains(ChangeFlag.ADDITION) || bmFlags.contains(ChangeFlag.MODIFICATION)
-                    || bmFlags.contains(ChangeFlag.DELETION);
+            this.buildModelChanged =
+                    bmFlags.contains(ChangeFlag.EXTRACTION_CHANGE) || bmFlags.contains(ChangeFlag.ADDITION)
+                            || bmFlags.contains(ChangeFlag.MODIFICATION) || bmFlags.contains(ChangeFlag.DELETION);
             Collection<ChangeFlag> vmFlags = hybridCache.getBmFlags();
-            this.buildModelChanged = vmFlags.contains(ChangeFlag.ADDITION) || vmFlags.contains(ChangeFlag.MODIFICATION)
-                    || vmFlags.contains(ChangeFlag.DELETION);
+            this.variabilityModelChanged =
+                    bmFlags.contains(ChangeFlag.EXTRACTION_CHANGE) || vmFlags.contains(ChangeFlag.ADDITION)
+                            || vmFlags.contains(ChangeFlag.MODIFICATION) || vmFlags.contains(ChangeFlag.DELETION);
 
             // if bm or cm changed, we need the entire code model
             if (buildModelChanged || variabilityModelChanged) {
+                LOGGER.logInfo("Performing a full analysis based the parts of the code model"
+                        + " from the current and previous extractions");
                 cm = hybridCache.readCm();
             } else {
                 // if bm and cm remained the same, we only need the newly
                 // extracted parts of the code model
-                cm = hybridCache.readCm(hybridCache.getCmPathsForFlag(ChangeFlag.EXTRACTION_CHANGE));
+                LOGGER.logInfo("Performing a partial analysis based newly extracted parts of the code model");
+                cm = hybridCache.readCmForFlags(ChangeFlag.EXTRACTION_CHANGE);
 
             }
 
@@ -444,7 +440,8 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         loadModelsFromHybridCache();
 
         if (vm == null || bm == null || cm == null) {
-            LOGGER.logError("Couldn't get models");
+            LOGGER.logError("Couldn't get models: ", "got variability model: " + (vm != null),
+                    "got build model: " + (vm != null), "got code model: " + (cm != null));
             return;
         }
 
@@ -454,30 +451,32 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             // If only variability related variables should be considered, the
             // set of considered SourceFile elements is reduced to the source files
             // that were changed in regards to their variability information
-            SourceFileDifferenceDetector detector = null;
             if (onlyVariabilyRelatedVariables) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
+            }
+
+            SourceFileDifferenceDetector detector = null;
+            boolean reduceCodeModel = false;
+            if (codeModelOptimization) {
                 try {
                     detector = new SourceFileDifferenceDetector(Consideration.ONLY_VARIABILITY_CHANGE, vm,
                             hybridCache.readPreviousVm());
+                    reduceCodeModel = !buildModelChanged && !variabilityModelChanged;
                 } catch (IOException e) {
                     LOGGER.logException("Could not read previous variability model", e);
                 }
-
             }
 
-            Iterator<SourceFile<?>> iterator = cm.iterator();
-            while (iterator.hasNext()) {
-
-                @NonNull
-                SourceFile<?> sourceFile = iterator.next();
+            for (SourceFile<?> sourceFile : cm) {
                 boolean analyzeSourceFile = true;
-                try {
-                    analyzeSourceFile = detector == null
-                            || detector.isDifferent(sourceFile, hybridCache.readCm(sourceFile.getPath()));
+                if (reduceCodeModel) {
+                    try {
+                        analyzeSourceFile =
+                                detector.isDifferent(sourceFile, hybridCache.readPreviousCm(sourceFile.getPath()));
 
-                } catch (IOException e) {
-                    LOGGER.logException("Could not read previous sourceFile for path " + sourceFile.getPath(), e);
+                    } catch (IOException e) {
+                        LOGGER.logException("Could not read previous sourceFile for path " + sourceFile.getPath(), e);
+                    }
                 }
 
                 if (analyzeSourceFile) {
