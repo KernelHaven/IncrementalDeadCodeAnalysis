@@ -64,9 +64,14 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
         try {
             vmCnf = new VmToCnfConverter().convertVmToCnf(notNull(vm));
 
-            // if option to only consider variability related items was selected,
-            // instantiate relevancyChecker
-            if (onlyVariabilyRelatedVariables) {
+            /*
+             * if option to only consider variability related items was selected,
+             * instantiate relevancyChecker. Otherwise it remains set to null. The
+             * relevancyChecker itself is used within the findDeadCodeBlocks() method and
+             * checks every presence condition for its relevance. If the relevancyChecker is
+             * null, all blocks will be considered for analysis.
+             */
+            if (onlyConsiderVariabilityRelatedVariables) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
             }
 

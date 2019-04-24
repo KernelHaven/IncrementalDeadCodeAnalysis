@@ -49,7 +49,7 @@ import net.ssehub.kernel_haven.variability_model.VariabilityModel;
 public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> {
 
     /** The only variabily related variables. */
-    protected boolean onlyVariabilyRelatedVariables;
+    protected boolean onlyConsiderVariabilityRelatedVariables;
 
     /** The relevancy checker. */
     protected LinuxFormulaRelevancyChecker relevancyChecker;
@@ -103,7 +103,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
         IncrementalDeadCodeAnalysisSettings.registerAllSettings(config);
         this.postExtraction = postExtraction;
 
-        onlyVariabilyRelatedVariables = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
+        onlyConsiderVariabilityRelatedVariables = config.getValue(DefaultSettings.ANALYSIS_USE_VARMODEL_VARIABLES_ONLY);
         buildModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.BUILD_MODEL_OPTIMIZATION);
         codeModelOptimization = config.getValue(IncrementalDeadCodeAnalysisSettings.CODE_MODEL_OPTIMIZATION);
     }
@@ -415,13 +415,13 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 
             // if bm or cm changed, we need the entire code model
             if (buildModelChanged || variabilityModelChanged) {
-                LOGGER.logInfo("Performing a full analysis based the parts of the code model"
+                LOGGER.logInfo("Performing a full analysis based on the complete code model."
                         + " from the current and previous extractions");
                 cm = hybridCache.readCm();
             } else {
                 // if bm and cm remained the same, we only need the newly
                 // extracted parts of the code model
-                LOGGER.logInfo("Performing a partial analysis based newly extracted parts of the code model");
+                LOGGER.logInfo("Performing a partial analysis based on newly extracted parts of the code model.");
                 cm = hybridCache.readCmForFlags(ChangeFlag.EXTRACTION_CHANGE);
 
             }
@@ -451,7 +451,7 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
             // If only variability related variables should be considered, the
             // set of considered SourceFile elements is reduced to the source files
             // that were changed in regards to their variability information
-            if (onlyVariabilyRelatedVariables) {
+            if (onlyConsiderVariabilityRelatedVariables) {
                 relevancyChecker = new LinuxFormulaRelevancyChecker(vm, true);
             }
 
