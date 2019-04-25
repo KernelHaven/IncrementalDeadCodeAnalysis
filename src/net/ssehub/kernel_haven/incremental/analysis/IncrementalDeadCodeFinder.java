@@ -405,13 +405,18 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 
             Collection<ChangeFlag> bmFlags = hybridCache.getBmFlags();
 
-            this.buildModelChanged =
-                    bmFlags.contains(ChangeFlag.EXTRACTION_CHANGE) || bmFlags.contains(ChangeFlag.ADDITION)
-                            || bmFlags.contains(ChangeFlag.MODIFICATION) || bmFlags.contains(ChangeFlag.DELETION);
+            // If the changes were auxillary changes, we do not consider them to be relevant
+            // changes for the analysis.
+            this.buildModelChanged = bmFlags.contains(ChangeFlag.EXTRACTION_CHANGE)
+                    || bmFlags.contains(ChangeFlag.ADDITION) || bmFlags.contains(ChangeFlag.MODIFICATION)
+                    || bmFlags.contains(ChangeFlag.DELETION) && !bmFlags.contains(ChangeFlag.AUXILLARY_CHANGE);
             Collection<ChangeFlag> vmFlags = hybridCache.getBmFlags();
-            this.variabilityModelChanged =
-                    bmFlags.contains(ChangeFlag.EXTRACTION_CHANGE) || vmFlags.contains(ChangeFlag.ADDITION)
-                            || vmFlags.contains(ChangeFlag.MODIFICATION) || vmFlags.contains(ChangeFlag.DELETION);
+
+            // If the changes were auxillary changes, we do not consider them to be relevant
+            // changes for the analysis.
+            this.variabilityModelChanged = bmFlags.contains(ChangeFlag.EXTRACTION_CHANGE)
+                    || vmFlags.contains(ChangeFlag.ADDITION) || vmFlags.contains(ChangeFlag.MODIFICATION)
+                    || vmFlags.contains(ChangeFlag.DELETION) && !bmFlags.contains(ChangeFlag.AUXILLARY_CHANGE);
 
             // if bm or cm changed, we need the entire code model
             if (buildModelChanged || variabilityModelChanged) {
