@@ -83,18 +83,25 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
              */
             SourceFileDifferenceDetector detector = null;
             boolean reduceCodeModel = false;
-            if (codeModelOptimization) {
+            
+            // the code model can be further optimized for partial analyses
+            // in this case we instantiate the detector and enable the reduction of the code
+            // model
+            if (codeModelOptimization && !cm.isEmpty() && !buildModelChanged && !variabilityModelChanged) {
                 try {
                     detector = new SourceFileDifferenceDetector(Consideration.ONLY_VARIABILITY_CHANGE, vm,
                             hybridCache.readPreviousVm());
-                    // we can only skip SourceCode elements if the build and variability model did
-                    // not change. Otherwise we need to consider all files.
-                    reduceCodeModel = !buildModelChanged && !variabilityModelChanged;
+
+                    reduceCodeModel = true;
+                    LOGGER.logInfo(
+                            "Analysis targets will be chosen considering the difference between current and previous code model.");
                 } catch (IOException e) {
                     LOGGER.logException("Could not read previous variability model", e);
                 }
             }
 
+            LOGGER.logInfo("Dead Code Detection will be performed using " + numThreads + " Threads.");
+            
             OrderPreservingParallelizer<SourceFile<?>, List<@NonNull DeadCodeBlock>> parallelizer =
                     new OrderPreservingParallelizer<>(this::findDeadCodeBlocks, (deadBlocks) -> {
                         for (DeadCodeBlock block : deadBlocks) {
@@ -102,6 +109,7 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
                         }
                     }, numThreads);
 
+            int sourceFilesCovered = 0;
             // Feed parallelizer with input
             for (SourceFile<?> sourceFile : cm) {
                 boolean analyzeSourceFile = true;
@@ -118,6 +126,7 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
                     }
                 }
                 if (analyzeSourceFile) {
+                    sourceFilesCovered++;
                     parallelizer.add(sourceFile);
                 } else {
                     LOGGER.logDebug("Skipping " + sourceFile.getPath()
@@ -127,6 +136,7 @@ public class IncrementalThreadedDeadCodeFinder extends IncrementalDeadCodeFinder
 
             parallelizer.end();
             parallelizer.join();
+            LOGGER.logInfo("Analysis finished covering " + sourceFilesCovered + " source files.");
 
         } catch (FormatException e) {
             LOGGER.logException("Invalid variability model", e);
