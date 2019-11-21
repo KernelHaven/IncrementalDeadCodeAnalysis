@@ -167,8 +167,10 @@ public class IncrementalDeadCodeFinder extends AnalysisComponent<DeadCodeBlock> 
 				runForFile = !filePc.equals(previousFilePc);
 				if (!runForFile) {
 					LOGGER.logInfo("Skipping " + sourceFile.getPath() + " because its build PC did not change.");
+				} else {
+					LOGGER.logInfo("Processing " + sourceFile + " because its build PC did change.");
 				}
-			}
+			} 
 		}
 
 		if (runForFile) {
