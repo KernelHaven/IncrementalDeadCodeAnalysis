@@ -25,6 +25,16 @@ For the multithreaded-version, you can change the number of threads by including
 analysis.undead.threads = 20
 ``
 
+## Advanced Configuration
+
+In addition to the parameters of the incremental infrastructure itself, this analysis can be tweaked by the following parameters:
+
+- ```analysis.consider_vm_vars_only ```: This can either be set to true or false. If set to true, the analysis will skip checks for dead code blocks for any block that has no relation to a variability variable (e.g. a linux configuration option defined in KConfig). It thereby constrains the analysis to target only blocks that are related to the variability model.
+- ```incremental.analysis.code_model.optimization```: This option is used in analyses that run on only a part of the code model (this is possible if build and variability model have not changed) and compares the previous code model with the current code model. Through this comparison, the analysis can determine whether any of the blocks related to a variability variable have changed. It works by reducing the structure of nested code blocks to blocks that correspond to a variability variable and then determining whether the reduced previous model is the same as the reduced current one.
+- ```incremental.analysis.build_model.optimization```: This option is used when the build model changed but the variability model remained the same. After the extraction of the build model, it checks whether the build presence condition for a code file has changed by comparing it against the presence condition from the previous model. If it has not changed, the file can is skipped in the analysis.
+
+
+
 
 ## Dependencies
 
