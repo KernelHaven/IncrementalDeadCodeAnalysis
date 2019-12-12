@@ -8,6 +8,9 @@ Similar to UndeadAnalyzer, two variants of the analysis exist (a single-threaded
 ## Usage
 
 Place the jar-file downloaded from the releases section of this project into the plugins folder of KernelHaven.
+As with any incremental analysis, you need to use the IncrementalPreparation as preparation before the main KernelHaven infrastructure is started. You can achieve this by adding the following line to your configuration file
+
+```preparation.class.0 = net.ssehub.kernel_haven.incremental.preparation.IncrementalPreparation```
 
 `analysis.class` can be set to one of (depending on whether you want to run a multi-threaded or single-threaded version)
 
@@ -16,11 +19,12 @@ net.ssehub.kernel_haven.incremental.analysis.IncrementalDeadCodeAnalysis
 net.ssehub.kernel_haven.incremental.analysis.IncrementalThreadedDeadCodeAnalysis
 ``
 
-for the multithreaded-version, you can change the number of threads by including the folling line in your KernelHaven-configuration file:
+For the multithreaded-version, you can change the number of threads by including the folling line in your KernelHaven-configuration file:
 
 ``
 analysis.undead.threads = 20
 ``
+
 
 ## Dependencies
 
